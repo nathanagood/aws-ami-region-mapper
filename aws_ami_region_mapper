@@ -20,13 +20,15 @@ def find_ami(criteria):
         filter = "Microsoft Windows Server 2012 R2 RTM 64-bit Locale English AMI provided*"
         owners = "amazon"
     else:
-        filter = criteria.description
-        owners = None
+        filter = criteria.name or criteria.description
+        owners = criteria.owner
+
+    filter_name = 'name' if criteria.name else 'description'
 
     if owners:
-        results = client.describe_images(Filters=[{'Name': 'description', 'Values': [filter]}], Owners=[owners])
+        results = client.describe_images(Filters=[{'Name': filter_name, 'Values': [filter]}], Owners=[owners])
     else:
-        results = client.describe_images(Filters=[{'Name': 'description', 'Values': [filter]}])
+        results = client.describe_images(Filters=[{'Name': filter_name, 'Values': [filter]}])
 
     return results['Images']
 
@@ -48,17 +50,19 @@ def build_region_map(ami_name, base_image_id):
 
 
 parser = argparse.ArgumentParser(description="Find AWS AMIs and build region maps")
+parser.add_argument("-o", "--owner", help="Filter based on owner", type=str, default=None)
 group = parser.add_mutually_exclusive_group()
 group.add_argument("-a", "--amazon-linux", help="Get latest Amazon Linux AMI", action="store_true")
 group.add_argument("-w", "--windows-2012", help="Get latest Windows Server 2012 AMI", action="store_true")
 group.add_argument("-d", "--description", help="Filter based on description", type=str)
+group.add_argument("-n", "--name", help="Filter based on name", type=str)
 group2 = parser.add_mutually_exclusive_group()
 group2.add_argument("-l", "--list", help="output a list of matching AMIs", action="store_true")
 group2.add_argument("-j", "--json", help="output a json region map", action="store_true")
 group2.add_argument("-y", "--yaml", help="output a yaml region map", action="store_true")
 args = parser.parse_args()
 
-if (args.amazon_linux or args.windows_2012 or args.description) and (args.list or args.json or args.yaml):
+if (args.amazon_linux or args.windows_2012 or args.description or args.name) and (args.list or args.json or args.yaml):
     amis = find_ami(args)
     if amis:
         amis = sorted(amis, key=lambda x: x['CreationDate'], reverse=True)
